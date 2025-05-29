@@ -53,6 +53,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { userAPI } from '@/common/api/user.js'
 
 const nickname = ref('张三')  // 默认昵称
 const avatarUrl = ref('/static/icons/default-avatar.png')  // 默认头像
@@ -71,7 +72,7 @@ function chooseAvatar() {
 }
 
 // 修改密码
-function changePassword() {
+async function changePassword() {
   if (!oldPassword.value || !newPassword.value) {
     uni.showToast({
       title: '请输入旧密码和新密码',
@@ -79,28 +80,53 @@ function changePassword() {
     })
     return
   }
-  // 调用 API 修改密码（此处模拟）
-  uni.showToast({
-    title: '密码修改成功',
-    icon: 'success',
-    duration: 2000
-  })
+  
+  try {
+    await userAPI.updatePassword({
+      old_password: oldPassword.value,
+      new_password: newPassword.value
+    })
+    
+    uni.showToast({
+      title: '密码修改成功',
+      icon: 'success',
+      duration: 2000
+    })
+    
+    // 清空密码输入框
+    oldPassword.value = ''
+    newPassword.value = ''
+  } catch (error) {
+    uni.showToast({
+      title: '密码修改失败',
+      icon: 'error'
+    })
+  }
 }
 
 // 退出登录功能
 function logout() {
-  uni.showToast({
-    title: '已退出登录',
-    icon: 'success',
-    duration: 2000
-  })
-  
-  // 清除用户登录状态数据（如 token、用户信息等）
-  // uni.removeStorageSync('token');  // 示例，假设你有存储 token 的逻辑
-
-  // 退出登录后跳转到登录页面
-  uni.navigateTo({
-    url: '/pages/login/login'
+  uni.showModal({
+    title: '确认退出',
+    content: '确定要退出登录吗？',
+    success: (res) => {
+      if (res.confirm) {
+        // 清除本地存储的用户数据
+        uni.removeStorageSync('token')
+        uni.removeStorageSync('userInfo')
+        
+        uni.showToast({
+          title: '已退出登录',
+          icon: 'success',
+          duration: 2000
+        })
+        
+        // 跳转到登录页面
+        uni.reLaunch({
+          url: '/pages/login/login'
+        })
+      }
+    }
   })
 }
 

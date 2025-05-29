@@ -38,11 +38,13 @@
 </template>
 
 <script>
+import { userAPI } from '@/common/api/user.js'
+
 export default {
   data() {
     return {
-      balance: 8542.36,
-      expense: 2260.45, // 新增本月花销
+      balance: 0,
+      expense: 0,
       features: [
         { name: '记账', desc: '记录每一笔收支', icon: '/static/icons/book.png', path: '/pages/transaction/transaction' },
         { name: '财务分析', desc: '可视化您的消费', icon: '/static/icons/chart.png', path: '/pages/analyze/analyze' },
@@ -53,7 +55,25 @@ export default {
       ]
     }
   },
+  onLoad() {
+    this.loadHomeData()
+  },
   methods: {
+    async loadHomeData() {
+      try {
+        const res = await userAPI.getHome()
+        if (res.Data) {
+          this.expense = res.Data.month_amount || 0
+        }
+        
+        const stats = await userAPI.getStats()
+        if (stats.Data) {
+          this.balance = stats.Data.total_income - stats.Data.total_expense || 0
+        }
+      } catch (error) {
+        console.error('加载首页数据失败:', error)
+      }
+    },
     goPage(path) {
       uni.navigateTo({ url: path });
     }

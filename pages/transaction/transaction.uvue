@@ -63,34 +63,61 @@
 </template>
 
 <script>
+import { transactionAPI } from '@/common/api/transaction.js'
+import { categoryAPI } from '@/common/api/category.js'
+
 export default {
   data() {
     return {
       type: '支出',
       amount: '',
-      selectedCategory: '餐饮',
+      selectedCategory: '',
       date: '',
-      categories: [
-        { name: '餐饮', icon: '🍔' },
-        { name: '购物', icon: '🛒' },
-        { name: '交通', icon: '🚗' },
-        { name: '住房', icon: '🏠' },
-        { name: '娱乐', icon: '🎬' },
-        { name: '数码', icon: '📱' },
-        { name: '服饰', icon: '👗' },
-        { name: '其他', icon: '➕' }
-      ]
+      categories: []
     };
   },
-  onLoad() {
+  async onLoad() {
     this.date = this.formatDate(new Date())
+    await this.loadCategories()
   },
   methods: {
+    async loadCategories() {
+      try {
+        const ie = this.type === '收入' ? 'income' : 'expense'
+        const res = await categoryAPI.getList({ income_expense: ie })
+        if (res.Data && res.Data.length > 0) {
+          this.categories = res.Data.map(cat => ({
+            id: cat.id,
+            name: cat.name,
+            icon: cat.icon || '📝'
+          }))
+          // 设置默认选中第一个分类
+          if (this.categories.length > 0) {
+            this.selectedCategory = this.categories[0].name
+          }
+        }
+      } catch (error) {
+        console.error('加载分类失败:', error)
+        // 如果API失败，使用硬编码的分类作为备选
+        this.categories = [
+          { name: '餐饮', icon: '🍔', id: 1 },
+          { name: '购物', icon: '🛒', id: 2 },
+          { name: '交通', icon: '🚗', id: 3 },
+          { name: '住房', icon: '🏠', id: 4 },
+          { name: '娱乐', icon: '🎬', id: 5 },
+          { name: '数码', icon: '📱', id: 6 },
+          { name: '服饰', icon: '👗', id: 7 },
+          { name: '其他', icon: '➕', id: 8 }
+        ]
+        this.selectedCategory = this.categories[0].name
+      }
+    },
     goBack() {
       uni.navigateBack();
     },
-    changeType(newType) {
+    async changeType(newType) {
       this.type = newType;
+      await this.loadCategories() // 重新加载对应类型的分类
     },
     formatDate(date) {
       const y = date.getFullYear();
@@ -98,19 +125,41 @@ export default {
       const d = date.getDate().toString().padStart(2, '0');
       return `${y}年${m}月${d}日`;
     },
-    submitTransaction() {
+    async submitTransaction() {
       if (!this.amount) {
         uni.showToast({ title: '请输入金额', icon: 'none' });
         return;
       }
-      const data = {
-        type: this.type,
-        amount: this.amount,
-        category: this.selectedCategory,
-        date: this.date
-      };
-      console.log('记录已保存：', data);
-      uni.showToast({ title: '记录已保存', icon: 'success' });
+      
+      try {
+        const selectedCat = this.categories.find(cat => cat.name === this.selectedCategory)
+        if (!selectedCat) {
+          uni.showToast({ title: '请选择分类', icon: 'none' });
+          return;
+        }
+        
+        const data = {
+          amount: parseFloat(this.amount) * 100, // 转换为分
+          category_id: selectedCat.id,
+          income_expense: this.type === '收入' ? 'income' : 'expense',
+          remark: '',
+          trade_time: new Date().toISOString()
+        };
+        
+        await transactionAPI.create(data)
+        uni.showToast({ title: '记录已保存', icon: 'success' });
+        
+        // 清空表单
+        this.amount = ''
+        this.selectedCategory = this.categories.length > 0 ? this.categories[0].name : ''
+        
+        setTimeout(() => {
+          uni.navigateBack()
+        }, 1500)
+      } catch (error) {
+        console.error('保存失败:', error)
+        uni.showToast({ title: '保存失败', icon: 'error' });
+      }
     }
   }
 }
