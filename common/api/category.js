@@ -2,7 +2,7 @@ import request from './request.js'
 
 export const categoryAPI = {
   // 获取分类列表
-  getList(params) {
+  getList(params = {}) {
     return request({
       url: '/user/category/list',
       method: 'GET',
