@@ -1,0 +1,22 @@
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /workspace
+
+# Install Vue CLI globally
+RUN npm install -g @vue/cli
+
+# Copy package files first for better caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Expose port for development server
+EXPOSE 8080
+
+# Default command for development
+CMD ["npm", "run", "dev:h5"]

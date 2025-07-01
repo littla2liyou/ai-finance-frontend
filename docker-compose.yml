@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-finance-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - ai-finance-network
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service for hot reload
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ai-finance-frontend-dev
+    ports:
+      - "8080:8080"
+    networks:
+      - ai-finance-network
+    environment:
+      - NODE_ENV=development
+      - API_BASE_URL=http://Accouting:8080
+    volumes:
+      - .:/workspace
+      - /workspace/node_modules
+    restart: unless-stopped
+    command: npm run dev:h5
+
+networks:
+  ai-finance-network:
+    external: true

@@ -1,43 +1,33 @@
 {
-    "name" : "AI Financial Management",
-    "appid" : "__UNI__F094AA7",
-    "description" : "",
-    "versionName" : "1.0.0",
-    "versionCode" : "100",
-    "uni-app-x" : {},
-    /* 快应用特有相关 */
-    "quickapp" : {},
-    /* 小程序特有相关 */
-    "mp-weixin" : {
-        "appid" : "",
-        "setting" : {
-            "urlCheck" : false
-        },
-        "usingComponents" : true
+  "name": "AI Finance Frontend",
+  "appid": "__UNI__XXXXXXXX",
+  "description": "AI Finance Frontend Application",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "uni-app": {
+    "compilerVersion": "3.4.15",
+    "control": "uni-v3",
+    "nvueCompiler": "uni-app",
+    "renderer": "auto",
+    "nvue": {
+      "flex-direction": "column"
     },
-    "mp-alipay" : {
-        "usingComponents" : true
-    },
-    "mp-baidu" : {
-        "usingComponents" : true
-    },
-    "mp-toutiao" : {
-        "usingComponents" : true
-    },
-    "uniStatistics" : {
-        "enable" : false
-    },
-    "vueVersion" : "3",
-    "app" : {
-        "distribute" : {
-            "icons" : {
-                "android" : {
-                    "hdpi" : "",
-                    "xhdpi" : "",
-                    "xxhdpi" : "",
-                    "xxxhdpi" : ""
-                }
-            }
-        }
+    "usingComponents": true
+  },
+  "h5": {
+    "title": "AI Finance Frontend",
+    "router": {
+      "mode": "history"
     }
+  },
+  "mp-weixin": {
+    "appid": "wx1234567890abcdef",
+    "setting": {
+      "urlCheck": false
+    }
+  },
+  "app-plus": {
+    "backgroundColor": "#ffffff",
+    "usingComponents": true
+  }
 }
