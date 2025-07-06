@@ -207,3 +207,17 @@ export const getWeeklyStatistic = (params: {
     requireAuth: true
   });
 }
+
+// 获取年度统计
+export const getYearlyStatistic = (params: {
+  startTime?: string;
+  endTime?: string;
+  incomeExpense?: 'income' | 'expense';
+}): Promise<ApiResponse<any>> => {
+  return request<ApiResponse<any>>({
+    url: '/api/user/transaction/statistic/year',
+    method: 'POST',
+    data: params,
+    requireAuth: true
+  });
+}

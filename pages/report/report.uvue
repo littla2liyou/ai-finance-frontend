@@ -67,7 +67,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getAIReport, getUserStatistics, getTotalStatistics } from '../../common/api/report'
+import { getAIReport, getHistoryReport } from '../../common/api/report'
+import { getMonthStatistic, getTotalStatistic, getWeeklyStatistic, getYearlyStatistic } from '../../common/api/transaction'
 
 // 根据类型获取时间范围
 function getTimeRange(type: 'week' | 'month' | 'year'): { startTime: string, endTime: string } {
@@ -94,9 +95,13 @@ function getTimeRange(type: 'week' | 'month' | 'year'): { startTime: string, end
       startTime = new Date(now.getFullYear(), now.getMonth(), 1)
   }
   
+  // 设置时间为当天的开始和结束
+  startTime.setHours(0, 0, 0, 0)
+  endTime.setHours(23, 59, 59, 999)
+  
   return {
-    startTime: startTime.toISOString().split('T')[0],
-    endTime: endTime.toISOString().split('T')[0]
+    startTime: startTime.toISOString(),
+    endTime: endTime.toISOString()
   }
 }
 
@@ -195,22 +200,70 @@ async function generateReport() {
     // 获取正确的时间范围
     const { startTime, endTime } = getTimeRange(type)
     
-    // 并行获取AI报告和用户统计数据
-    const [aiResponse, statsResponse] = await Promise.all([
-      getAIReport({
-        type,
-        stats: {
-          start_time: startTime,
-          end_time: endTime,
-          type: type
-        }
-      }),
-      getTotalStatistics() // 暂时使用总统计API来测试
-    ])
+    console.log('生成报告参数:', { type, startTime, endTime })
+    
+    // 获取用户的记账统计数据 - 使用与首页相同的API
+    let statsResponse
+    if (type === 'month') {
+      statsResponse = await getMonthStatistic({
+        startTime: startTime,
+        endTime: endTime
+      })
+    } else if (type === 'week') {
+      statsResponse = await getWeeklyStatistic({
+        startTime: startTime,
+        endTime: endTime
+      })
+    } else if (type === 'year') {
+      statsResponse = await getYearlyStatistic({
+        startTime: startTime,
+        endTime: endTime
+      })
+    } else {
+      // 默认使用月报API
+      statsResponse = await getMonthStatistic({
+        startTime: startTime,
+        endTime: endTime
+      })
+    }
+    
+    console.log('用户统计数据响应:', statsResponse)
+    
+    // 准备传递给AI的数据
+    let aiStatsData = null
+    
+    if (statsResponse && statsResponse.success && statsResponse.data) {
+      // 参考首页的数据处理方式
+      const statsList = statsResponse.data.List || [statsResponse.data]
+      aiStatsData = {
+        list: statsList.map((item: any) => {
+          // 获取实际的统计数据
+          const statistics = item.IEStatistic || item
+          return {
+            period: item.Period || `${startTime} 到 ${endTime}`,
+            start_time: item.StartTime || startTime,
+            end_time: item.EndTime || endTime,
+            statistics: {
+              Income: statistics.Income || { Amount: 0, Count: 0 },
+              Expense: statistics.Expense || { Amount: 0, Count: 0 }
+            }
+          }
+        })
+      }
+      console.log('使用实际统计数据:', aiStatsData)
+    } else {
+      // 如果没有统计数据，传递空数据让后端自动查询
+      aiStatsData = { list: [] }
+      console.log('没有统计数据，传递空数据让后端自动查询')
+    }
+    
+    // 生成AI报告
+    const aiResponse = await getAIReport({
+      type,
+      stats: aiStatsData
+    })
     
     console.log('AI报告生成响应:', aiResponse)
-    console.log('用户统计数据响应:', statsResponse)
-    console.log('用户统计数据响应的完整结构:', JSON.stringify(statsResponse, null, 2))
     
     // 处理AI报告数据
     if (aiResponse && (aiResponse.summary || aiResponse.suggestion || aiResponse.tags)) {
@@ -223,36 +276,37 @@ async function generateReport() {
       throw new Error('AI返回数据格式错误')
     }
     
-    // 处理用户统计数据
-    if (statsResponse) {
+    // 处理用户统计数据用于显示 - 参考首页的处理方式
+    if (statsResponse && statsResponse.success && statsResponse.data) {
       console.log('找到统计数据，开始处理...')
-      // 尝试不同的方式访问数据
-      let totalStats = null
       
-      if (statsResponse.Data) {
-        totalStats = statsResponse.Data
-        console.log('通过Data属性访问成功')
-      } else if (statsResponse.data) {
-        totalStats = statsResponse.data
-        console.log('通过data属性访问成功')
+      // 处理统计数据，参考首页的逻辑
+      let totalStats
+      if (statsResponse.data.List && statsResponse.data.List.length > 0) {
+        // 如果是列表格式，取第一个
+        totalStats = statsResponse.data.List[0]
       } else {
-        // 尝试直接访问
-        totalStats = statsResponse
-        console.log('直接访问statsResponse')
+        // 如果是单个对象格式
+        totalStats = statsResponse.data
       }
       
-      console.log('总统计数据:', totalStats)
+      console.log('处理后的统计数据:', totalStats)
       
-      if (totalStats && (totalStats.Income || totalStats.Expense)) {
-        updateReportDataWithTotalStats(totalStats)
+      // 检查数据结构，支持不同的响应格式
+      if (totalStats && (totalStats.Income || totalStats.Expense || totalStats.IEStatistic)) {
+        // 如果数据在IEStatistic字段中
+        if (totalStats.IEStatistic) {
+          updateReportDataWithTotalStats(totalStats.IEStatistic)
+        } else {
+          // 如果数据直接在根级别
+          updateReportDataWithTotalStats(totalStats)
+        }
       } else {
         console.log('没有找到有效的统计数据')
         updateReportDataWithNoData()
       }
     } else {
       console.log('没有找到统计数据，显示默认信息')
-      console.log('statsResponse:', statsResponse)
-      // 如果没有统计数据，显示默认信息
       updateReportDataWithNoData()
     }
     
@@ -283,6 +337,7 @@ function updateReportDataWithTotalStats(totalStats: any) {
   console.log('totalStats.Income:', totalStats.Income)
   console.log('totalStats.Expense:', totalStats.Expense)
   
+  // 参考首页的数据处理方式
   const income = totalStats.Income || { Amount: 0, Count: 0 }
   const expense = totalStats.Expense || { Amount: 0, Count: 0 }
   
@@ -291,8 +346,9 @@ function updateReportDataWithTotalStats(totalStats: any) {
   console.log('收入Amount:', income.Amount)
   console.log('支出Amount:', expense.Amount)
   
-  const incomeAmount = income.Amount / 100 // 转换为元
-  const expenseAmount = expense.Amount / 100 // 转换为元
+  // 转换为元，参考首页的处理方式
+  const incomeAmount = (income.Amount || 0) / 100
+  const expenseAmount = (expense.Amount || 0) / 100
   const savings = incomeAmount - expenseAmount
   const savingsRate = incomeAmount > 0 ? (savings / incomeAmount * 100) : 0
   
@@ -307,13 +363,13 @@ function updateReportDataWithTotalStats(totalStats: any) {
     { 
       label: '总收入', 
       value: `¥${incomeAmount.toFixed(2)}`, 
-      trend: `${income.Count}笔交易`, 
+      trend: `${income.Count || 0}笔交易`, 
       trendType: 'green' 
     },
     { 
       label: '总支出', 
       value: `¥${expenseAmount.toFixed(2)}`, 
-      trend: `${expense.Count}笔交易`, 
+      trend: `${expense.Count || 0}笔交易`, 
       trendType: 'red' 
     },
     { 
